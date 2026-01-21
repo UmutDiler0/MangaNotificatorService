@@ -2,6 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 import os
 import json
+import base64
 
 class FirebaseNotificationService:
     def __init__(self):
@@ -11,17 +12,38 @@ class FirebaseNotificationService:
     def _initialize_firebase(self):
         """Firebase Admin SDK'yı başlatır"""
         try:
-            # Firebase servis hesabı JSON dosyası kontrolü
+            # Önce environment variable'ları kontrol et (Render, Heroku vb. için)
+            if os.environ.get('FIREBASE_CREDENTIALS'):
+                # JSON string olarak environment variable
+                cred_dict = json.loads(os.environ.get('FIREBASE_CREDENTIALS'))
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                self.initialized = True
+                print("✓ Firebase Admin SDK başlatıldı (Environment Variable)")
+                return
+            
+            elif os.environ.get('FIREBASE_CREDENTIALS_BASE64'):
+                # Base64 encoded JSON
+                cred_json = base64.b64decode(os.environ.get('FIREBASE_CREDENTIALS_BASE64'))
+                cred_dict = json.loads(cred_json)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                self.initialized = True
+                print("✓ Firebase Admin SDK başlatıldı (Base64)")
+                return
+            
+            # Local file kontrolü (development için)
             service_account_path = os.path.join(os.path.dirname(__file__), 'firebase-service-account.json')
             
             if os.path.exists(service_account_path):
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
                 self.initialized = True
-                print("✓ Firebase Admin SDK başarıyla başlatıldı")
+                print("✓ Firebase Admin SDK başlatıldı (Local File)")
             else:
                 print("⚠ firebase-service-account.json dosyası bulunamadı")
                 print("⚠ Firebase Console'dan servis hesabı JSON dosyasını indirip proje klasörüne kaydedin")
+                print("⚠ Veya FIREBASE_CREDENTIALS environment variable'ını ayarlayın")
                 self.initialized = False
         except Exception as e:
             print(f"⚠ Firebase başlatma hatası: {e}")

@@ -155,6 +155,12 @@ scraper = MangaScraper()
 # Otomatik güncelleme scheduler'ı
 manga_scheduler = MangaScheduler(scraper, notification_service, db_manager)
 
+# Scheduler'ı başlat (production'da)
+import os
+if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+    manga_scheduler.start()
+    print("✓ Scheduler production modunda başlatıldı")
+
 
 @app.route('/', methods=['GET'])
 def home():
