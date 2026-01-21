@@ -4,12 +4,20 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import time
+import os
 from firebase_config import FirebaseNotificationService
 from database import DatabaseManager
 from scheduler import MangaScheduler
 
 app = Flask(__name__)
-CORS(app)  # Android'den erişim için CORS desteği
+
+# CORS ayarları - production için optimize edildi
+if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+    # Production'da tüm originlere izin ver (Android uygulaması için)
+    CORS(app, resources={r"/*": {"origins": "*"}})
+else:
+    # Development'ta tüm CORS açık
+    CORS(app)
 
 # Firebase bildirim servisi
 notification_service = FirebaseNotificationService()
@@ -587,8 +595,17 @@ if __name__ == '__main__':
     print("=" * 60)
     print("MANGA NOTIFICATOR API")
     print("=" * 60)
-    print("API çalışıyor...")
-    print("URL: http://localhost:5000")
+    
+    # Environment kontrol
+    if os.environ.get('RENDER'):
+        print("🌐 Mode: PRODUCTION (Render)")
+        port = int(os.environ.get('PORT', 10000))
+        print(f"📡 Port: {port}")
+    else:
+        print("💻 Mode: DEVELOPMENT")
+        print("URL: http://localhost:5000")
+        port = 5000
+    
     print("\nEndpoints:")
     print("  GET  /health                      - API durumunu kontrol et")
     print("  POST /api/manga/latest            - Manga listesi gönder")
@@ -601,6 +618,9 @@ if __name__ == '__main__':
     print("=" * 60)
     
     # Scheduler'ı başlat
-    manga_scheduler.start()
+    if not os.environ.get('RENDER'):
+        # Development'ta manuel başlat
+        manga_scheduler.start()
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Development server
+    app.run(host='0.0.0.0', port=port, debug=not os.environ.get('RENDER'))

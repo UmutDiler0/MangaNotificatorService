@@ -5,8 +5,13 @@ from typing import List, Dict, Optional
 
 class DatabaseManager:
     def __init__(self, db_path='database.json'):
-        self.db_path = db_path
+        # Render için /tmp dizinini kullan (ephemeral storage)
+        if os.environ.get('RENDER'):
+            self.db_path = '/tmp/database.json'
+        else:
+            self.db_path = db_path
         self.db = self._load_database()
+        print(f"📁 Database yolu: {self.db_path}")
     
     def _load_database(self):
         """Veritabanını yükler, yoksa oluşturur"""
