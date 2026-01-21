@@ -17,6 +17,10 @@ notification_service = FirebaseNotificationService()
 # Veritabanı yöneticisi
 db_manager = DatabaseManager()
 
+@app.route("/")
+def home():
+    return "OK"
+
 class MangaScraper:
     def __init__(self):
         self.headers = {
