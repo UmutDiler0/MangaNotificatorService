@@ -1,6 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import time
+import os
 from database import DatabaseManager
 from firebase_config import FirebaseNotificationService
 
@@ -11,6 +12,7 @@ class MangaScheduler:
         self.db_manager = db_manager
         self.scheduler = BackgroundScheduler()
         self.is_running = False
+        self.test_mode = os.environ.get('TEST_MODE', 'false').lower() == 'true'
     
     def check_manga_updates(self):
         """Tüm takip edilen mangaları kontrol eder ve güncelleme varsa bildirim gönderir"""
@@ -150,30 +152,51 @@ class MangaScheduler:
             print(f"❌ Bildirim gönderme hatası: {e}")
     
     def start(self):
-        """Scheduler'ı başlatır - Her gün saat 18:00'de çalışır"""
+        """Scheduler'ı başlatır - Test modunda 2 dakikada bir, Production'da her gün saat 18:00'de çalışır"""
         if self.is_running:
             print("⚠ Scheduler zaten çalışıyor")
             return
         
-        # Her gün saat 18:00'de çalışacak
-        self.scheduler.add_job(
-            self.check_manga_updates,
-            'cron',
-            hour=18,
-            minute=0,
-            id='manga_update_check',
-            name='Manga Güncelleme Kontrolü',
-            replace_existing=True
-        )
-        
-        self.scheduler.start()
-        self.is_running = True
-        
-        print("\n" + "="*60)
-        print("🕐 OTOMATIK GÜNCELLEME SİSTEMİ AKTİF")
-        print("="*60)
-        print("⏰ Kontrol Zamanı: Her gün saat 18:00")
-        print("📊 Durum: Çalışıyor")
+        if self.test_mode:
+            # TEST MODE: Her 2 dakikada bir çalışır
+            self.scheduler.add_job(
+                self.check_manga_updates,
+                'interval',
+                minutes=2,
+                id='manga_update_check',
+                name='Manga Güncelleme Kontrolü (TEST)',
+                replace_existing=True
+            )
+            
+            self.scheduler.start()
+            self.is_running = True
+            
+            print("\n" + "="*60)
+            print("🧪 TEST MODU AKTİF - OTOMATIK GÜNCELLEME")
+            print("="*60)
+            print("⏰ Kontrol Zamanı: Her 2 dakikada bir")
+            print("🔬 Test için kullanıcı ve manga ekleyin")
+            print("📊 Durum: Çalışıyor")
+        else:
+            # PRODUCTION MODE: Her gün saat 18:00'de çalışır
+            self.scheduler.add_job(
+                self.check_manga_updates,
+                'cron',
+                hour=18,
+                minute=0,
+                id='manga_update_check',
+                name='Manga Güncelleme Kontrolü',
+                replace_existing=True
+            )
+            
+            self.scheduler.start()
+            self.is_running = True
+            
+            print("\n" + "="*60)
+            print("🕐 OTOMATIK GÜNCELLEME SİSTEMİ AKTİF")
+            print("="*60)
+            print("⏰ Kontrol Zamanı: Her gün saat 18:00")
+            print("📊 Durum: Çalışıyor")
         
         # İstatistikler
         stats = self.db_manager.get_stats()
