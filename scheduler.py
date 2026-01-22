@@ -46,9 +46,22 @@ class MangaScheduler:
                         # Önceki bölüm bilgisini al
                         old_info = self.db_manager.get_manga_chapter(manga_name)
                         
-                        # Bölüm değişmiş mi kontrol et
-                        if self.db_manager.check_chapter_changed(manga_name, new_chapter):
-                            print(f"  ✅ YENİ BÖLÜM: {manga_name} - Chapter {new_chapter}")
+                        # Bölüm değişikliğini kontrol et
+                        is_new, has_changed = self.db_manager.check_chapter_changed(manga_name, new_chapter)
+                        
+                        if is_new:
+                            # İlk kez kontrol ediliyor - sadece kaydet, bildirim gönderme
+                            print(f"  📝 İlk kayıt: {manga_name} - Chapter {new_chapter}")
+                            self.db_manager.update_manga_chapter(
+                                manga_name=manga_name,
+                                chapter=new_chapter,
+                                url=manga_info['url'],
+                                image=manga_info['image']
+                            )
+                        elif has_changed:
+                            # Bölüm değişmiş - güncelle ve bildirim gönder
+                            old_chapter = old_info['chapter'] if old_info else 'unknown'
+                            print(f"  ✅ YENİ BÖLÜM: {manga_name} - {old_chapter} → {new_chapter}")
                             
                             # Veritabanını güncelle
                             self.db_manager.update_manga_chapter(
@@ -58,15 +71,16 @@ class MangaScheduler:
                                 image=manga_info['image']
                             )
                             
-                            # Güncelleme bilgisini kaydet
+                            # Güncelleme bilgisini kaydet (bildirim için)
                             updates_found.append({
                                 'manga_name': manga_name,
                                 'chapter': new_chapter,
                                 'url': manga_info['url'],
                                 'image': manga_info['image'],
-                                'old_chapter': old_info['chapter'] if old_info else None
+                                'old_chapter': old_chapter
                             })
                         else:
+                            # Değişiklik yok
                             print(f"  ℹ Değişiklik yok: {manga_name} - Chapter {new_chapter}")
                     else:
                         print(f"  ❌ Bulunamadı: {manga_name}")

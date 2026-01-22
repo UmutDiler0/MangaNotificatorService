@@ -556,12 +556,17 @@ def scheduler_status():
             'success': True,
             'scheduler': {
                 'is_running': manga_scheduler.is_running,
+                'test_mode': manga_scheduler.test_mode,
                 'next_run': next_run.isoformat() if next_run else None,
                 'last_check': stats['last_check']
             },
             'stats': {
                 'total_users': stats['total_users'],
-                'tracked_manga': len(db_manager.get_all_tracked_manga())
+                'tracked_manga': len(db_manager.get_all_tracked_manga()),
+                'tracked_manga_list': db_manager.get_all_tracked_manga()
+            },
+            'database': {
+                'manga_chapters': db_manager.get_all_manga_chapters()
             }
         }), 200
         

@@ -105,13 +105,19 @@ class DatabaseManager:
         """Tüm manga bölüm bilgilerini getirir"""
         return self.db['manga_chapters']
     
-    def check_chapter_changed(self, manga_name: str, new_chapter: str) -> bool:
-        """Bölümün değişip değişmediğini kontrol eder"""
+    def check_chapter_changed(self, manga_name: str, new_chapter: str) -> tuple[bool, bool]:
+        """
+        Bölümün değişip değişmediğini kontrol eder
+        Returns: (is_new, has_changed)
+            - is_new: İlk kez mi kontrol ediliyor
+            - has_changed: Bölüm değişmiş mi
+        """
         old_data = self.get_manga_chapter(manga_name)
         if not old_data:
-            return True  # İlk kez kontrol ediliyorsa değişiklik var sayılır
+            return (True, False)  # İlk kez, değişiklik yok (henüz bildirim gönderme)
         
-        return old_data.get('chapter') != new_chapter
+        has_changed = old_data.get('chapter') != new_chapter
+        return (False, has_changed)  # İlk değil, değişiklik kontrolü
     
     def update_last_check(self):
         """Son kontrol zamanını günceller"""
