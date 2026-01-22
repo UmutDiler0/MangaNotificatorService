@@ -163,11 +163,13 @@ scraper = MangaScraper()
 # Otomatik güncelleme scheduler'ı
 manga_scheduler = MangaScheduler(scraper, notification_service, db_manager)
 
-# Scheduler'ı başlat (production'da)
-import os
+# Production'da scheduler'ı otomatik başlat
 if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
-    manga_scheduler.start()
-    print("✓ Scheduler production modunda başlatıldı")
+    try:
+        manga_scheduler.start()
+        print("✓ Scheduler production modunda başlatıldı")
+    except Exception as e:
+        print(f"⚠ Scheduler başlatma hatası: {e}")
 
 
 @app.route('/', methods=['GET'])
