@@ -219,7 +219,7 @@ def health_check():
     })
 
 
-@app.route('/api/manga/latest', methods=['POST'])
+@app.route('/api/manga/latest', methods=['POST', 'OPTIONS'])
 def get_latest_chapters():
     """
     Android uygulamasından manga listesi alır ve son bölümleri döndürür
@@ -236,6 +236,9 @@ def get_latest_chapters():
         {"name": "Nano Machine", "chapter": "295", "found": true, "url": "https://ravenscans.org/nano-machine-chapter-295/", "image": "https://ravenscans.org/wp-content/uploads/2024/12/nano-machine.jpg"}
     ]
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
         # JSON verisini al
         data = request.get_json()
@@ -413,7 +416,7 @@ def send_bulk_notification():
         }), 500
 
 
-@app.route('/api/user/register', methods=['POST'])
+@app.route('/api/user/register', methods=['POST', 'OPTIONS'])
 def register_user():
     """
     Kullanıcı kaydı ve token kaydetme
@@ -425,6 +428,9 @@ def register_user():
         "manga_list": ["One Piece", "Lookism"]
     }
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
         data = request.get_json()
         
@@ -460,7 +466,7 @@ def register_user():
         }), 500
 
 
-@app.route('/api/user/manga-list', methods=['POST'])
+@app.route('/api/user/manga-list', methods=['POST', 'OPTIONS'])
 def update_manga_list():
     """
     Kullanıcının takip ettiği manga listesini günceller
@@ -471,6 +477,9 @@ def update_manga_list():
         "manga_list": ["One Piece", "Lookism", "Solo Leveling"]
     }
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
         data = request.get_json()
         
@@ -577,9 +586,12 @@ def scheduler_status():
         }), 500
 
 
-@app.route('/api/scheduler/run-now', methods=['POST'])
+@app.route('/api/scheduler/run-now', methods=['POST', 'OPTIONS'])
 def run_scheduler_now():
     """Scheduler'ı hemen çalıştırır (test için)"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
         manga_scheduler.run_now()
         return jsonify({
