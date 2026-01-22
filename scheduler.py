@@ -132,17 +132,15 @@ class MangaScheduler:
                 
                 if tokens_to_send:
                     # Bildirim başlığı ve içeriği
-                    title = f"📖 {manga_name}"
-                    if old_chapter:
-                        body = f"Yeni bölüm yayınlandı! Chapter {chapter}"
-                    else:
-                        body = f"Chapter {chapter} yayınlandı!"
+                    title = f"{manga_name} - Yeni Bölüm!"
+                    body = f"Chapter {chapter} yayınlandı! 📖"
                     
                     # Bildirim verisi
                     notification_data = {
                         'type': 'chapter_update',
                         'manga_name': manga_name,
                         'chapter': chapter,
+                        'old_chapter': old_chapter,
                         'url': url or '',
                         'image': image or ''
                     }
