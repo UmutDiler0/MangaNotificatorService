@@ -55,21 +55,34 @@ class MangaScraper:
                 chapters = soup.find_all('a', href=re.compile(f'/{manga_slug}-chapter-'))
                 
                 if chapters:
-                    first_chapter = chapters[0]
-                    chapter_text = first_chapter.get_text()
-                    chapter_url = first_chapter.get('href')
+                    # En yüksek bölüm numarasını bul (ters sırada olabilir)
+                    latest_chapter_num = None
+                    latest_chapter_url = None
                     
-                    # Tam URL'i oluştur
-                    if chapter_url and not chapter_url.startswith('http'):
-                        chapter_url = f"https://ravenscans.org{chapter_url}"
+                    for chapter_link in chapters:
+                        chapter_text = chapter_link.get_text()
+                        chapter_url = chapter_link.get('href')
+                        
+                        # Chapter numarasını bul
+                        match = re.search(r'Chapter\s+(\d+(?:\.\d+)?)', chapter_text, re.IGNORECASE)
+                        if not match:
+                            match = re.search(r'(\d+(?:\.\d+)?)', chapter_text)
+                        
+                        if match:
+                            chapter_num = float(match.group(1))
+                            
+                            # En yüksek bölümü sakla
+                            if latest_chapter_num is None or chapter_num > latest_chapter_num:
+                                latest_chapter_num = chapter_num
+                                latest_chapter_url = chapter_url
                     
-                    match = re.search(r'Chapter\s+(\d+)', chapter_text, re.IGNORECASE)
-                    if match:
-                        return match.group(1), chapter_url, image_url
-                    
-                    match = re.search(r'(\d+)', chapter_text)
-                    if match:
-                        return match.group(1), chapter_url, image_url
+                    if latest_chapter_num:
+                        # Tam URL'i oluştur
+                        if latest_chapter_url and not latest_chapter_url.startswith('http'):
+                            latest_chapter_url = f"https://ravenscans.org{latest_chapter_url}"
+                        
+                        # Integer olarak döndür
+                        return str(int(latest_chapter_num)), latest_chapter_url, image_url
         except Exception as e:
             pass
         return None, None, None
