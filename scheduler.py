@@ -85,7 +85,8 @@ class MangaScheduler:
                     else:
                         print(f"  ❌ Bulunamadı: {manga_name}")
                     
-                    time.sleep(0.5)  # Rate limiting
+                    # Her manga arasında 14 dakika bekle (Render aktif kalsın)
+                    time.sleep(840)  # 14 dakika = 840 saniye
                     
                 except Exception as e:
                     print(f"  ❌ Hata ({manga_name}): {e}")
@@ -164,13 +165,13 @@ class MangaScheduler:
             print(f"❌ Bildirim gönderme hatası: {e}")
     
     def start(self):
-        """Scheduler'ı başlatır - Test modunda 2 dakikada bir, Production'da her gün saat 18:00'de çalışır"""
+        """Scheduler'ı başlatır - Her 3 saatte bir çalışır, mangalar arası 14 dakika"""
         if self.is_running:
             print("⚠ Scheduler zaten çalışıyor")
             return
         
         if self.test_mode:
-            # TEST MODE: Her 2 dakikada bir çalışır
+            # TEST MODE: Her 2 dakikada bir çalışır (hızlı test için)
             self.scheduler.add_job(
                 self.check_manga_updates,
                 'interval',
@@ -187,17 +188,16 @@ class MangaScheduler:
             print("🧪 TEST MODU AKTİF - OTOMATIK GÜNCELLEME")
             print("="*60)
             print("⏰ Kontrol Zamanı: Her 2 dakikada bir")
-            print("🔬 Test için kullanıcı ve manga ekleyin")
+            print("⚠️  Mangalar arası bekleme: 14 dakika")
             print("📊 Durum: Çalışıyor")
         else:
-            # PRODUCTION MODE: Her gün saat 18:00'de çalışır
+            # PRODUCTION MODE: Her 3 saatte bir çalışır
             self.scheduler.add_job(
                 self.check_manga_updates,
-                'cron',
-                hour=18,
-                minute=0,
+                'interval',
+                hours=3,
                 id='manga_update_check',
-                name='Manga Güncelleme Kontrolü',
+                name='Manga Güncelleme Kontrolü (3 Saatlik)',
                 replace_existing=True
             )
             
@@ -207,7 +207,8 @@ class MangaScheduler:
             print("\n" + "="*60)
             print("🕐 OTOMATIK GÜNCELLEME SİSTEMİ AKTİF")
             print("="*60)
-            print("⏰ Kontrol Zamanı: Her gün saat 18:00")
+            print("⏰ Kontrol Zamanı: Her 3 saatte bir")
+            print("⏳ Mangalar arası bekleme: 14 dakika (Render aktif kalır)")
             print("📊 Durum: Çalışıyor")
         
         # İstatistikler
