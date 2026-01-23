@@ -14,26 +14,48 @@ class MangaScheduler:
         self.is_running = False
         self.test_mode = os.environ.get('TEST_MODE', 'false').lower() == 'true'
     
-    def check_manga_updates(self):
-        """Tüm takip edilen mangaları kontrol eder ve güncelleme varsa bildirim gönderir"""
+    def check_single_manga_by_position(self):
+        """Her 14 dakikada bir, sıradaki pozisyondaki mangaları kontrol eder"""
         print(f"\n{'='*60}")
-        print(f"Manga güncellemeleri kontrol ediliyor... {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"⏰ Pozisyon bazlı manga kontrolü... {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*60}")
         
         try:
-            # Takip edilen tüm benzersiz mangaları al
-            tracked_manga = self.db_manager.get_all_tracked_manga()
+            # Tüm kullanıcıları al
+            all_users = self.db_manager.get_all_users()
             
-            if not tracked_manga:
-                print("⚠ Takip edilen manga yok")
+            if not all_users:
+                print("⚠ Kayıtlı kullanıcı yok")
                 return
             
-            print(f"📚 Kontrol edilen manga sayısı: {len(tracked_manga)}")
+            # Kontrol edilecek pozisyonu al/başlat
+            if not hasattr(self, 'current_position'):
+                self.current_position = 0
+            
+            # Bu pozisyondaki tüm benzersiz mangaları topla
+            manga_at_position = set()
+            max_list_length = 0
+            
+            for device_id, user_data in all_users.items():
+                manga_list = user_data.get('manga_list', [])
+                max_list_length = max(max_list_length, len(manga_list))
+                
+                # Bu pozisyonda manga varsa ekle
+                if self.current_position < len(manga_list):
+                    manga_at_position.add(manga_list[self.current_position])
+            
+            # Manga yoksa başa dön
+            if not manga_at_position:
+                print(f"📍 Pozisyon {self.current_position + 1}: Manga yok, başa dönülüyor")
+                self.current_position = 0
+                return
+            
+            print(f"📍 Pozisyon {self.current_position + 1}: {len(manga_at_position)} manga kontrol edilecek")
             
             updates_found = []
             
-            # Her manga için güncelleme kontrolü yap
-            for manga_name in tracked_manga:
+            # Bu pozisyondaki her mangayı kontrol et
+            for manga_name in manga_at_position:
                 try:
                     print(f"🔍 Kontrol ediliyor: {manga_name}")
                     
@@ -50,7 +72,7 @@ class MangaScheduler:
                         is_new, has_changed = self.db_manager.check_chapter_changed(manga_name, new_chapter)
                         
                         if is_new:
-                            # İlk kez kontrol ediliyor - sadece kaydet, bildirim gönderme
+                            # İlk kez kontrol ediliyor - sadece kaydet
                             print(f"  📝 İlk kayıt: {manga_name} - Chapter {new_chapter}")
                             self.db_manager.update_manga_chapter(
                                 manga_name=manga_name,
@@ -71,7 +93,7 @@ class MangaScheduler:
                                 image=manga_info['image']
                             )
                             
-                            # Güncelleme bilgisini kaydet (bildirim için)
+                            # Güncelleme bilgisini kaydet
                             updates_found.append({
                                 'manga_name': manga_name,
                                 'chapter': new_chapter,
@@ -80,13 +102,9 @@ class MangaScheduler:
                                 'old_chapter': old_chapter
                             })
                         else:
-                            # Değişiklik yok
                             print(f"  ℹ Değişiklik yok: {manga_name} - Chapter {new_chapter}")
                     else:
                         print(f"  ❌ Bulunamadı: {manga_name}")
-                    
-                    # Her manga arasında 14 dakika bekle (Render aktif kalsın)
-                    time.sleep(840)  # 14 dakika = 840 saniye
                     
                 except Exception as e:
                     print(f"  ❌ Hata ({manga_name}): {e}")
@@ -96,8 +114,16 @@ class MangaScheduler:
             if updates_found:
                 print(f"\n📢 {len(updates_found)} yeni bölüm bulundu!")
                 self._send_update_notifications(updates_found)
+            
+            # Sonraki pozisyona geç
+            self.current_position += 1
+            
+            # En uzun listenin sonuna geldiysek başa dön
+            if self.current_position >= max_list_length:
+                print(f"\n🔄 Tüm pozisyonlar kontrol edildi, başa dönülüyor\n")
+                self.current_position = 0
             else:
-                print("\n✓ Hiç güncelleme bulunamadı")
+                print(f"\n➡️  Sonraki pozisyon: {self.current_position + 1}\n")
             
             # Son kontrol zamanını güncelle
             self.db_manager.update_last_check()
@@ -106,6 +132,10 @@ class MangaScheduler:
             
         except Exception as e:
             print(f"❌ Kontrol hatası: {e}")
+    
+    def check_manga_updates(self):
+        """Eski metod - geriye uyumluluk için"""
+        self.check_single_manga_by_position()
     
     def _send_update_notifications(self, updates):
         """Güncellenen mangalar için bildirimleri gönderir"""
@@ -188,16 +218,16 @@ class MangaScheduler:
             print("🧪 TEST MODU AKTİF - OTOMATIK GÜNCELLEME")
             print("="*60)
             print("⏰ Kontrol Zamanı: Her 2 dakikada bir")
-            print("⚠️  Mangalar arası bekleme: 14 dakika")
+            print("📍 Pozisyon bazlı kontrol (1. manga → 2. manga → ...)")
             print("📊 Durum: Çalışıyor")
         else:
-            # PRODUCTION MODE: Her 3 saatte bir çalışır
+            # PRODUCTION MODE: Her 14 dakikada bir çalışır
             self.scheduler.add_job(
                 self.check_manga_updates,
                 'interval',
-                hours=3,
+                minutes=14,
                 id='manga_update_check',
-                name='Manga Güncelleme Kontrolü (3 Saatlik)',
+                name='Manga Güncelleme Kontrolü (14 Dakika)',
                 replace_existing=True
             )
             
@@ -207,8 +237,9 @@ class MangaScheduler:
             print("\n" + "="*60)
             print("🕐 OTOMATIK GÜNCELLEME SİSTEMİ AKTİF")
             print("="*60)
-            print("⏰ Kontrol Zamanı: Her 3 saatte bir")
-            print("⏳ Mangalar arası bekleme: 14 dakika (Render aktif kalır)")
+            print("⏰ Kontrol Zamanı: Her 14 dakikada bir")
+            print("📍 Her seferinde sıradaki pozisyonun mangalarını kontrol eder")
+            print("🔄 Render sürekli aktif kalır")
             print("📊 Durum: Çalışıyor")
         
         # İstatistikler
