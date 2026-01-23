@@ -941,6 +941,44 @@ def get_user(device_id):
         }), 500
 
 
+@app.route('/api/admin/reset-database', methods=['POST', 'OPTIONS'])
+def reset_database():
+    """
+    SADECE TEST İÇİN - Database'i temizler
+    
+    Request Body:
+    {
+        "confirm": "RESET_ALL_DATA"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data or data.get('confirm') != 'RESET_ALL_DATA':
+            return jsonify({
+                'success': False,
+                'error': 'Onay gerekli: {"confirm": "RESET_ALL_DATA"}'
+            }), 400
+        
+        # Database'i sıfırla
+        db_manager.db = db_manager._create_empty_db()
+        db_manager._save_database()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database temizlendi. Yeni kullanıcı kaydedebilirsiniz.'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/scheduler/status', methods=['GET'])
 def scheduler_status():
     """Scheduler durumunu döner"""
