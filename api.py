@@ -941,6 +941,38 @@ def get_user(device_id):
         }), 500
 
 
+@app.route('/api/admin/list-users', methods=['GET'])
+def list_all_users():
+    """
+    SADECE TEST İÇİN - Tüm kullanıcıları listeler (şifre hariç)
+    """
+    try:
+        all_users = db_manager.get_all_users()
+        
+        # Şifre hash'lerini çıkar
+        users_safe = {}
+        for username, user_data in all_users.items():
+            users_safe[username] = {
+                'username': username,
+                'fcm_token': user_data.get('fcm_token', ''),
+                'manga_list': user_data.get('manga_list', []),
+                'created_at': user_data.get('created_at', ''),
+                'has_password': bool(user_data.get('password_hash', ''))
+            }
+        
+        return jsonify({
+            'success': True,
+            'total_users': len(users_safe),
+            'users': users_safe
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/admin/reset-database', methods=['POST', 'OPTIONS'])
 def reset_database():
     """
