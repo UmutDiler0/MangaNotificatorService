@@ -429,9 +429,323 @@ def send_bulk_notification():
         }), 500
 
 
+@app.route('/api/auth/register', methods=['POST', 'OPTIONS'])
+def auth_register():
+    """
+    Yeni kullanıcı kaydı (Username/Password)
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123",
+        "fcm_token": "optional_fcm_token"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        fcm_token = data.get('fcm_token', '')
+        
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'error': 'username ve password gerekli'
+            }), 400
+        
+        # Kullanıcı adı kontrolü (alfanumerik ve en az 3 karakter)
+        if len(username) < 3 or not username.replace('_', '').replace('-', '').isalnum():
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı en az 3 karakter olmalı ve sadece harf, rakam, - ve _ içerebilir'
+            }), 400
+        
+        # Şifre uzunluk kontrolü
+        if len(password) < 6:
+            return jsonify({
+                'success': False,
+                'error': 'Şifre en az 6 karakter olmalı'
+            }), 400
+        
+        # Kullanıcı oluştur
+        success = db_manager.create_user(username, password, fcm_token)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Kullanıcı başarıyla oluşturuldu',
+                'username': username
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Bu kullanıcı adı zaten kullanılıyor'
+            }), 409
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
+def auth_login():
+    """
+    Kullanıcı girişi
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'error': 'username ve password gerekli'
+            }), 400
+        
+        # Kullanıcıyı doğrula
+        if db_manager.authenticate_user(username, password):
+            user_data = db_manager.get_user(username)
+            return jsonify({
+                'success': True,
+                'message': 'Giriş başarılı',
+                'user': user_data
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı veya şifre hatalı'
+            }), 401
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/user/update-token', methods=['POST', 'OPTIONS'])
+def update_fcm_token():
+    """
+    Kullanıcının FCM token'ını günceller
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123",
+        "fcm_token": "new_fcm_token"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        fcm_token = data.get('fcm_token')
+        
+        if not username or not password or not fcm_token:
+            return jsonify({
+                'success': False,
+                'error': 'username, password ve fcm_token gerekli'
+            }), 400
+        
+        # Kullanıcıyı doğrula
+        if not db_manager.authenticate_user(username, password):
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı veya şifre hatalı'
+            }), 401
+        
+        # Token'ı güncelle
+        success = db_manager.update_fcm_token(username, fcm_token)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'FCM token güncellendi'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Token güncellenirken hata oluştu'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/user/manga/add', methods=['POST', 'OPTIONS'])
+def add_manga():
+    """
+    Kullanıcının listesine manga ekler
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123",
+        "manga_name": "One Piece"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        manga_name = data.get('manga_name')
+        
+        if not username or not password or not manga_name:
+            return jsonify({
+                'success': False,
+                'error': 'username, password ve manga_name gerekli'
+            }), 400
+        
+        # Kullanıcıyı doğrula
+        if not db_manager.authenticate_user(username, password):
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı veya şifre hatalı'
+            }), 401
+        
+        # Manga ekle
+        success = db_manager.add_manga_to_user(username, manga_name)
+        
+        if success:
+            user_data = db_manager.get_user(username)
+            return jsonify({
+                'success': True,
+                'message': 'Manga eklendi',
+                'manga_list': user_data['manga_list']
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Manga eklenirken hata oluştu'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/user/manga/remove', methods=['POST', 'OPTIONS'])
+def remove_manga():
+    """
+    Kullanıcının listesinden manga çıkarır
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123",
+        "manga_name": "One Piece"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        manga_name = data.get('manga_name')
+        
+        if not username or not password or not manga_name:
+            return jsonify({
+                'success': False,
+                'error': 'username, password ve manga_name gerekli'
+            }), 400
+        
+        # Kullanıcıyı doğrula
+        if not db_manager.authenticate_user(username, password):
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı veya şifre hatalı'
+            }), 401
+        
+        # Manga çıkar
+        success = db_manager.remove_manga_from_user(username, manga_name)
+        
+        if success:
+            user_data = db_manager.get_user(username)
+            return jsonify({
+                'success': True,
+                'message': 'Manga çıkarıldı',
+                'manga_list': user_data['manga_list']
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Manga çıkarılırken hata oluştu'
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/user/register', methods=['POST', 'OPTIONS'])
 def register_user():
     """
+    DEPRECATED - Geriye dönük uyumluluk için
     Kullanıcı kaydı ve token kaydetme
     
     Request Body:
