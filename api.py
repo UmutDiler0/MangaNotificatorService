@@ -552,6 +552,66 @@ def auth_login():
         }), 500
 
 
+@app.route('/api/user/profile', methods=['POST', 'OPTIONS'])
+def get_user_profile():
+    """
+    Kullanıcı profilini getirir (manga listesi dahil)
+    
+    Request Body:
+    {
+        "username": "johndoe",
+        "password": "securepassword123"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'error': 'username ve password gerekli'
+            }), 400
+        
+        # Kullanıcıyı doğrula
+        if not db_manager.authenticate_user(username, password):
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı adı veya şifre hatalı'
+            }), 401
+        
+        # Kullanıcı bilgilerini getir
+        user_data = db_manager.get_user(username)
+        
+        if user_data:
+            return jsonify({
+                'success': True,
+                'user': user_data
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı bulunamadı'
+            }), 404
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/user/update-token', methods=['POST', 'OPTIONS'])
 def update_fcm_token():
     """
