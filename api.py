@@ -447,6 +447,11 @@ def auth_register():
     try:
         data = request.get_json()
         
+        print(f"\n{'='*60}")
+        print("📝 REGISTER ENDPOINT ÇAĞRILDI")
+        print(f"Request data: {data}")
+        print(f"{'='*60}")
+        
         if not data:
             return jsonify({
                 'success': False,
@@ -456,6 +461,10 @@ def auth_register():
         username = data.get('username')
         password = data.get('password')
         fcm_token = data.get('fcm_token', '')
+        
+        print(f"👤 Username: {username}")
+        print(f"🔒 Password uzunluğu: {len(password) if password else 0}")
+        print(f"📱 FCM Token: {fcm_token[:20]}..." if fcm_token else "Yok")
         
         if not username or not password:
             return jsonify({
@@ -478,21 +487,33 @@ def auth_register():
             }), 400
         
         # Kullanıcı oluştur
+        print(f"🔨 create_user() çağrılıyor...")
         success = db_manager.create_user(username, password, fcm_token)
         
+        print(f"✅ Kayıt sonucu: {success}")
+        
         if success:
+            # Hemen kontrol et
+            all_users = db_manager.get_all_users()
+            print(f"📊 Kayıttan sonra toplam kullanıcı: {len(all_users)}")
+            print(f"🔑 Kullanıcılar: {list(all_users.keys())}")
+            print(f"{'='*60}\n")
+            
             return jsonify({
                 'success': True,
                 'message': 'Kullanıcı başarıyla oluşturuldu',
                 'username': username
             }), 201
         else:
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': False,
                 'error': 'Bu kullanıcı adı zaten kullanılıyor'
             }), 409
         
     except Exception as e:
+        print(f"❌ REGISTER HATA: {e}")
+        print(f"{'='*60}\n")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -516,6 +537,11 @@ def auth_login():
     try:
         data = request.get_json()
         
+        print(f"\n{'='*60}")
+        print("🔐 LOGIN ENDPOINT ÇAĞRILDI")
+        print(f"Request data: {data}")
+        print(f"{'='*60}")
+        
         if not data:
             return jsonify({
                 'success': False,
@@ -525,27 +551,42 @@ def auth_login():
         username = data.get('username')
         password = data.get('password')
         
+        print(f"👤 Username: {username}")
+        print(f"🔒 Password uzunluğu: {len(password) if password else 0}")
+        
         if not username or not password:
             return jsonify({
                 'success': False,
                 'error': 'username ve password gerekli'
             }), 400
         
+        # Önce mevcut kullanıcıları kontrol et
+        all_users = db_manager.get_all_users()
+        print(f"📊 Database'deki toplam kullanıcı: {len(all_users)}")
+        print(f"🔑 Kullanıcılar: {list(all_users.keys())}")
+        
         # Kullanıcıyı doğrula
+        print(f"🔨 authenticate_user() çağrılıyor...")
         if db_manager.authenticate_user(username, password):
             user_data = db_manager.get_user(username)
+            print(f"✅ Doğrulama başarılı, kullanıcı bilgisi alındı")
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': True,
                 'message': 'Giriş başarılı',
                 'user': user_data
             }), 200
         else:
+            print(f"❌ Doğrulama başarısız")
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': False,
                 'error': 'Kullanıcı adı veya şifre hatalı'
             }), 401
         
     except Exception as e:
+        print(f"❌ LOGIN HATA: {e}")
+        print(f"{'='*60}\n")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -947,11 +988,19 @@ def list_all_users():
     SADECE TEST İÇİN - Tüm kullanıcıları listeler (şifre hariç)
     """
     try:
+        print(f"\n{'='*60}")
+        print("📋 LIST-USERS ENDPOINT ÇAĞRILDI")
+        print(f"{'='*60}")
+        
         all_users = db_manager.get_all_users()
+        
+        print(f"📊 DB'den dönen kullanıcı sayısı: {len(all_users)}")
+        print(f"🔑 Kullanıcı adları: {list(all_users.keys())}")
         
         # Şifre hash'lerini çıkar
         users_safe = {}
         for username, user_data in all_users.items():
+            print(f"  → {username}: {user_data.get('manga_list', [])} manga")
             users_safe[username] = {
                 'username': username,
                 'fcm_token': user_data.get('fcm_token', ''),
@@ -960,13 +1009,17 @@ def list_all_users():
                 'has_password': bool(user_data.get('password_hash', ''))
             }
         
+        print(f"{'='*60}\n")
+        
         return jsonify({
             'success': True,
             'total_users': len(users_safe),
-            'users': users_safe
+            'users': users_safe,
+            'db_path': db_manager.db_path
         }), 200
         
     except Exception as e:
+        print(f"❌ LIST-USERS HATA: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
