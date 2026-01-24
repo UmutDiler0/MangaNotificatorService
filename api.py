@@ -723,7 +723,6 @@ def add_manga():
     Request Body:
     {
         "username": "johndoe",
-        "password": "securepassword123",
         "manga_name": "One Piece"
     }
     """
@@ -740,21 +739,21 @@ def add_manga():
             }), 400
         
         username = data.get('username')
-        password = data.get('password')
         manga_name = data.get('manga_name')
         
-        if not username or not password or not manga_name:
+        if not username or not manga_name:
             return jsonify({
                 'success': False,
-                'error': 'username, password ve manga_name gerekli'
+                'error': 'username ve manga_name gerekli'
             }), 400
         
-        # Kullanıcıyı doğrula
-        if not db_manager.authenticate_user(username, password):
+        # Kullanıcının var olup olmadığını kontrol et
+        user = db_manager.get_user(username)
+        if not user:
             return jsonify({
                 'success': False,
-                'error': 'Kullanıcı adı veya şifre hatalı'
-            }), 401
+                'error': 'Kullanıcı bulunamadı'
+            }), 404
         
         # Manga ekle
         success = db_manager.add_manga_to_user(username, manga_name)
@@ -787,7 +786,6 @@ def remove_manga():
     Request Body:
     {
         "username": "johndoe",
-        "password": "securepassword123",
         "manga_name": "One Piece"
     }
     """
@@ -804,21 +802,21 @@ def remove_manga():
             }), 400
         
         username = data.get('username')
-        password = data.get('password')
         manga_name = data.get('manga_name')
         
-        if not username or not password or not manga_name:
+        if not username or not manga_name:
             return jsonify({
                 'success': False,
-                'error': 'username, password ve manga_name gerekli'
+                'error': 'username ve manga_name gerekli'
             }), 400
         
-        # Kullanıcıyı doğrula
-        if not db_manager.authenticate_user(username, password):
+        # Kullanıcının var olup olmadığını kontrol et
+        user = db_manager.get_user(username)
+        if not user:
             return jsonify({
                 'success': False,
-                'error': 'Kullanıcı adı veya şifre hatalı'
-            }), 401
+                'error': 'Kullanıcı bulunamadı'
+            }), 404
         
         # Manga çıkar
         success = db_manager.remove_manga_from_user(username, manga_name)
