@@ -11,9 +11,6 @@ class DatabaseManager:
             # Render disk mount path (render.yaml'da tanımlanacak)
             disk_path = os.environ.get('DATABASE_PATH', '/var/data')
             self.db_path = os.path.join(disk_path, 'database.json')
-            
-            # Dizin yoksa oluştur
-            os.makedirs(disk_path, exist_ok=True)
         else:
             self.db_path = db_path
         
