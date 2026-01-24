@@ -57,6 +57,7 @@ class DatabaseManager:
     def create_user(self, username: str, password: str, fcm_token: str = None) -> bool:
         """Yeni kullanıcı oluşturur"""
         if username in self.db['users']:
+            print(f"⚠️ Kullanıcı zaten var: {username}")
             return False  # Kullanıcı zaten var
         
         self.db['users'][username] = {
@@ -66,7 +67,11 @@ class DatabaseManager:
             'created_at': datetime.now().isoformat()
         }
         
-        self._save_database()
+        print(f"✅ Kullanıcı oluşturuldu: {username}")
+        print(f"📊 Toplam kullanıcı sayısı: {len(self.db['users'])}")
+        
+        saved = self._save_database()
+        print(f"💾 Database kaydedildi: {saved} - Path: {self.db_path}")
         return True
     
     def authenticate_user(self, username: str, password: str) -> bool:
@@ -118,6 +123,9 @@ class DatabaseManager:
     
     def get_all_users(self) -> Dict:
         """Tüm kullanıcıları getirir"""
+        print(f"📋 get_all_users çağrıldı - Kullanıcı sayısı: {len(self.db['users'])}")
+        print(f"📄 Database path: {self.db_path}")
+        print(f"👥 Kullanıcılar: {list(self.db['users'].keys())}")
         return self.db['users']
     
     def update_user_manga_list(self, username: str, manga_list: List[str]) -> bool:
