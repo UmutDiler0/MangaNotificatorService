@@ -6,13 +6,20 @@ import hashlib
 
 class DatabaseManager:
     def __init__(self, db_path='database.json'):
-        # Render için /tmp dizinini kullan (ephemeral storage)
+        # Render için persistent disk kullan
         if os.environ.get('RENDER'):
-            self.db_path = '/tmp/database.json'
+            # Render disk mount path (render.yaml'da tanımlanacak)
+            disk_path = os.environ.get('DATABASE_PATH', '/var/data')
+            self.db_path = os.path.join(disk_path, 'database.json')
+            
+            # Dizin yoksa oluştur
+            os.makedirs(disk_path, exist_ok=True)
         else:
             self.db_path = db_path
+        
         self.db = self._load_database()
         print(f"📁 Database yolu: {self.db_path}")
+        print(f"📊 Başlangıçta {len(self.db.get('users', {}))} kullanıcı yüklendi")
     
     def _load_database(self):
         """Veritabanını yükler, yoksa oluşturur"""

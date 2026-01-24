@@ -6,7 +6,11 @@ services:
     plan: free
     branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    disk:
+      name: manga-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.7
@@ -16,5 +20,7 @@ services:
         value: "true"
       - key: PRODUCTION
         value: "true"
+      - key: DATABASE_PATH
+        value: "/var/data"
     healthCheckPath: /health
     autoDeploy: true
