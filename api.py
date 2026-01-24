@@ -732,6 +732,11 @@ def add_manga():
     try:
         data = request.get_json()
         
+        print(f"\n{'='*60}")
+        print("➕ ADD MANGA ENDPOINT ÇAĞRILDI")
+        print(f"Request data: {data}")
+        print(f"{'='*60}")
+        
         if not data:
             return jsonify({
                 'success': False,
@@ -741,37 +746,57 @@ def add_manga():
         username = data.get('username')
         manga_name = data.get('manga_name')
         
+        print(f"👤 Username: {username}")
+        print(f"📚 Manga: {manga_name}")
+        
         if not username or not manga_name:
             return jsonify({
                 'success': False,
                 'error': 'username ve manga_name gerekli'
             }), 400
         
+        # Önce mevcut tüm kullanıcıları kontrol et
+        all_users = db_manager.get_all_users()
+        print(f"📊 Database'deki toplam kullanıcı: {len(all_users)}")
+        print(f"🔑 Kullanıcılar: {list(all_users.keys())}")
+        
         # Kullanıcının var olup olmadığını kontrol et
         user = db_manager.get_user(username)
         if not user:
+            print(f"❌ Kullanıcı bulunamadı: {username}")
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': False,
                 'error': 'Kullanıcı bulunamadı'
             }), 404
+        
+        print(f"✅ Kullanıcı bulundu, manga ekleniyor...")
+        print(f"📋 Mevcut manga listesi: {user.get('manga_list', [])}")
         
         # Manga ekle
         success = db_manager.add_manga_to_user(username, manga_name)
         
         if success:
             user_data = db_manager.get_user(username)
+            print(f"✅ Manga başarıyla eklendi")
+            print(f"📋 Yeni manga listesi: {user_data['manga_list']}")
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': True,
                 'message': 'Manga eklendi',
                 'manga_list': user_data['manga_list']
             }), 200
         else:
+            print(f"❌ Manga eklenirken hata oluştu")
+            print(f"{'='*60}\n")
             return jsonify({
                 'success': False,
                 'error': 'Manga eklenirken hata oluştu'
             }), 500
         
     except Exception as e:
+        print(f"❌ ADD MANGA HATA: {e}")
+        print(f"{'='*60}\n")
         return jsonify({
             'success': False,
             'error': str(e)
