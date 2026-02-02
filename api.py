@@ -1305,3 +1305,6 @@ if __name__ == '__main__':
     
     # Development server
     app.run(host='0.0.0.0', port=port, debug=not os.environ.get('RENDER'))
+
+# WSGI uyumluluk için (Gunicorn, uWSGI, vb.)
+application = app

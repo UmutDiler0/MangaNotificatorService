@@ -6,7 +6,7 @@ services:
     plan: free
     branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api:app --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    startCommand: gunicorn api:application --bind 0.0.0.0:$PORT --workers 2 --timeout 300
     disk:
       name: manga-data
       mountPath: /var/data
