@@ -22,5 +22,7 @@ services:
         value: "true"
       - key: DATABASE_PATH
         value: "/var/data"
+      - key: JWT_SECRET_KEY
+        generateValue: true
     healthCheckPath: /health
     autoDeploy: true
