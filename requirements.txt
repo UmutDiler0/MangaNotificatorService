@@ -7,3 +7,4 @@ firebase-admin
 APScheduler
 waitress
 gunicorn
+PyJWT

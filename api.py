@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import re
 import time
 import os
+import jwt
+from datetime import datetime, timedelta
 from firebase_config import FirebaseNotificationService
 from database import DatabaseManager
 from scheduler import MangaScheduler
@@ -24,6 +26,44 @@ notification_service = FirebaseNotificationService()
 
 # Veritabanı yöneticisi
 db_manager = DatabaseManager()
+
+# JWT ayarları
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'manga-notificator-secret-key-2026')
+JWT_ALGORITHM = 'HS256'
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 saat
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 gün
+
+def create_access_token(username: str) -> str:
+    """Access token oluşturur (24 saat geçerli)"""
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        'username': username,
+        'exp': expire,
+        'type': 'access'
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def create_refresh_token(username: str) -> str:
+    """Refresh token oluşturur (30 gün geçerli)"""
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    payload = {
+        'username': username,
+        'exp': expire,
+        'type': 'refresh'
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def verify_token(token: str, token_type: str = 'access') -> dict:
+    """Token'ı doğrular ve payload'ı döner"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        if payload.get('type') != token_type:
+            return None
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 class MangaScraper:
     def __init__(self):
@@ -497,12 +537,22 @@ def auth_register():
             all_users = db_manager.get_all_users()
             print(f"📊 Kayıttan sonra toplam kullanıcı: {len(all_users)}")
             print(f"🔑 Kullanıcılar: {list(all_users.keys())}")
+            
+            # JWT token'ları oluştur
+            access_token = create_access_token(username)
+            refresh_token = create_refresh_token(username)
+            
+            print(f"🔑 Access token oluşturuldu (24 saat geçerli)")
+            print(f"🔄 Refresh token oluşturuldu (30 gün geçerli)")
             print(f"{'='*60}\n")
             
             return jsonify({
                 'success': True,
                 'message': 'Kullanıcı başarıyla oluşturuldu',
-                'username': username
+                'username': username,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'token_type': 'Bearer'
             }), 201
         else:
             print(f"{'='*60}\n")
@@ -569,12 +619,23 @@ def auth_login():
         print(f"🔨 authenticate_user() çağrılıyor...")
         if db_manager.authenticate_user(username, password):
             user_data = db_manager.get_user(username)
+            
+            # JWT token'ları oluştur
+            access_token = create_access_token(username)
+            refresh_token = create_refresh_token(username)
+            
             print(f"✅ Doğrulama başarılı, kullanıcı bilgisi alındı")
+            print(f"🔑 Access token oluşturuldu (24 saat geçerli)")
+            print(f"🔄 Refresh token oluşturuldu (30 gün geçerli)")
             print(f"{'='*60}\n")
+            
             return jsonify({
                 'success': True,
                 'message': 'Giriş başarılı',
-                'user': user_data
+                'user': user_data,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'token_type': 'Bearer'
             }), 200
         else:
             print(f"❌ Doğrulama başarısız")
@@ -587,6 +648,78 @@ def auth_login():
     except Exception as e:
         print(f"❌ LOGIN HATA: {e}")
         print(f"{'='*60}\n")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/auth/refresh', methods=['POST', 'OPTIONS'])
+def refresh_access_token():
+    """
+    Refresh token kullanarak yeni access token alır
+    
+    Request Body:
+    {
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    
+    Response:
+    {
+        "success": true,
+        "access_token": "new_access_token",
+        "token_type": "Bearer"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body gerekli'
+            }), 400
+        
+        refresh_token = data.get('refresh_token')
+        
+        if not refresh_token:
+            return jsonify({
+                'success': False,
+                'error': 'refresh_token gerekli'
+            }), 400
+        
+        # Refresh token'ı doğrula
+        payload = verify_token(refresh_token, token_type='refresh')
+        
+        if not payload:
+            return jsonify({
+                'success': False,
+                'error': 'Geçersiz veya süresi dolmuş refresh token'
+            }), 401
+        
+        username = payload.get('username')
+        
+        # Kullanıcının hala var olduğunu kontrol et
+        user = db_manager.get_user(username)
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Kullanıcı bulunamadı'
+            }), 404
+        
+        # Yeni access token oluştur
+        new_access_token = create_access_token(username)
+        
+        return jsonify({
+            'success': True,
+            'access_token': new_access_token,
+            'token_type': 'Bearer'
+        }), 200
+        
+    except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
