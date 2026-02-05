@@ -33,8 +33,9 @@ class DatabaseManager:
     def _create_empty_db(self):
         """Boş veritabanı yapısı oluşturur"""
         return {
-            'users': {},  # {username: {password_hash, fcm_token, manga_list, created_at}}
+            'users': {},  # {username: {password_hash, fcm_token, manga_list, anime_list, created_at}}
             'manga_chapters': {},  # {manga_name: {chapter, url, image, last_checked}}
+            'anime_episodes': {},  # {anime_name: {episode, url, image, last_checked}}
             'last_check': None
         }
     
@@ -68,6 +69,7 @@ class DatabaseManager:
             'password_hash': self._hash_password(password),
             'fcm_token': fcm_token or '',
             'manga_list': [],
+            'anime_list': [],
             'created_at': datetime.now().isoformat()
         }
         
@@ -121,6 +123,7 @@ class DatabaseManager:
                 'username': username,
                 'fcm_token': user.get('fcm_token', ''),
                 'manga_list': user.get('manga_list', []),
+                'anime_list': user.get('anime_list', []),
                 'created_at': user.get('created_at')
             }
         return None
@@ -209,13 +212,87 @@ class DatabaseManager:
         """Son kontrol zamanını getirir"""
         return self.db['last_check']
     
+    # ANIME OPERATIONS
+    
+    def update_user_anime_list(self, username: str, anime_list: List[str]) -> bool:
+        """Kullanıcının anime listesini günceller"""
+        if username in self.db['users']:
+            if 'anime_list' not in self.db['users'][username]:
+                self.db['users'][username]['anime_list'] = []
+            self.db['users'][username]['anime_list'] = anime_list
+            self._save_database()
+            return True
+        return False
+    
+    def add_anime_to_user(self, username: str, anime_name: str) -> bool:
+        """Kullanıcının listesine anime ekler"""
+        if username in self.db['users']:
+            if 'anime_list' not in self.db['users'][username]:
+                self.db['users'][username]['anime_list'] = []
+            if anime_name not in self.db['users'][username]['anime_list']:
+                self.db['users'][username]['anime_list'].append(anime_name)
+                self._save_database()
+            return True
+        return False
+    
+    def remove_anime_from_user(self, username: str, anime_name: str) -> bool:
+        """Kullanıcının listesinden anime çıkarır"""
+        if username in self.db['users']:
+            if 'anime_list' in self.db['users'][username]:
+                if anime_name in self.db['users'][username]['anime_list']:
+                    self.db['users'][username]['anime_list'].remove(anime_name)
+                    self._save_database()
+            return True
+        return False
+    
+    def update_anime_episode(self, anime_name: str, episode: str, url: str = None, image: str = None):
+        """Anime bölüm bilgisini günceller"""
+        if 'anime_episodes' not in self.db:
+            self.db['anime_episodes'] = {}
+        
+        self.db['anime_episodes'][anime_name] = {
+            'episode': episode,
+            'url': url,
+            'image': image,
+            'last_checked': datetime.now().isoformat()
+        }
+        self._save_database()
+    
+    def get_anime_episode(self, anime_name: str) -> Optional[Dict]:
+        """Anime bölüm bilgisini getirir"""
+        if 'anime_episodes' not in self.db:
+            self.db['anime_episodes'] = {}
+        return self.db['anime_episodes'].get(anime_name)
+    
+    def get_all_anime_episodes(self) -> Dict:
+        """Tüm anime bölüm bilgilerini getirir"""
+        if 'anime_episodes' not in self.db:
+            self.db['anime_episodes'] = {}
+        return self.db['anime_episodes']
+    
+    def check_episode_changed(self, anime_name: str, new_episode: str) -> tuple[bool, bool]:
+        """
+        Bölümün değişip değişmediğini kontrol eder
+        Returns: (is_new, has_changed)
+            - is_new: İlk kez mi kontrol ediliyor
+            - has_changed: Bölüm değişmiş mi
+        """
+        old_data = self.get_anime_episode(anime_name)
+        if not old_data:
+            return (True, False)  # İlk kez, değişiklik yok (henüz bildirim gönderme)
+        
+        has_changed = old_data.get('episode') != new_episode
+        return (False, has_changed)  # İlk değil, değişiklik kontrolü
+    
     # ANALYTICS
     
     def get_stats(self) -> Dict:
         """İstatistikleri döner"""
+        anime_count = len(self.db.get('anime_episodes', {}))
         return {
             'total_users': len(self.db['users']),
             'total_manga': len(self.db['manga_chapters']),
+            'total_anime': anime_count,
             'last_check': self.db['last_check']
         }
     
@@ -225,3 +302,10 @@ class DatabaseManager:
         for user in self.db['users'].values():
             all_manga.update(user.get('manga_list', []))
         return list(all_manga)
+    
+    def get_all_tracked_anime(self) -> List[str]:
+        """Tüm kullanıcıların takip ettiği benzersiz anime listesi"""
+        all_anime = set()
+        for user in self.db['users'].values():
+            all_anime.update(user.get('anime_list', []))
+        return list(all_anime)

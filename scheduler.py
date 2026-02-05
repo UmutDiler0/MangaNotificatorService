@@ -6,8 +6,9 @@ from database import DatabaseManager
 from firebase_config import FirebaseNotificationService
 
 class MangaScheduler:
-    def __init__(self, manga_scraper, notification_service: FirebaseNotificationService, db_manager: DatabaseManager):
+    def __init__(self, manga_scraper, anime_scraper, notification_service: FirebaseNotificationService, db_manager: DatabaseManager):
         self.manga_scraper = manga_scraper
+        self.anime_scraper = anime_scraper
         self.notification_service = notification_service
         self.db_manager = db_manager
         self.scheduler = BackgroundScheduler()
@@ -137,6 +138,188 @@ class MangaScheduler:
         """Eski metod - geriye uyumluluk için"""
         self.check_single_manga_by_position()
     
+    def check_single_anime_by_position(self):
+        """Her 14 dakikada bir, sıradaki pozisyondaki animeleri kontrol eder"""
+        print(f"\n{'='*60}")
+        print(f"⏰ Pozisyon bazlı anime kontrolü... {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}")
+        
+        try:
+            # Tüm kullanıcıları al
+            all_users = self.db_manager.get_all_users()
+            
+            if not all_users:
+                print("⚠ Kayıtlı kullanıcı yok")
+                return
+            
+            # Kontrol edilecek pozisyonu al/başlat
+            if not hasattr(self, 'current_anime_position'):
+                self.current_anime_position = 0
+            
+            # Bu pozisyondaki tüm benzersiz animeleri topla
+            anime_at_position = set()
+            max_list_length = 0
+            
+            for device_id, user_data in all_users.items():
+                anime_list = user_data.get('anime_list', [])
+                max_list_length = max(max_list_length, len(anime_list))
+                
+                # Bu pozisyonda anime varsa ekle
+                if self.current_anime_position < len(anime_list):
+                    anime_at_position.add(anime_list[self.current_anime_position])
+            
+            # Anime yoksa başa dön
+            if not anime_at_position:
+                print(f"📍 Pozisyon {self.current_anime_position + 1}: Anime yok, başa dönülüyor")
+                self.current_anime_position = 0
+                return
+            
+            print(f"📍 Pozisyon {self.current_anime_position + 1}: {len(anime_at_position)} anime kontrol edilecek")
+            
+            updates_found = []
+            
+            # Bu pozisyondaki her anime'yi kontrol et
+            for anime_name in anime_at_position:
+                try:
+                    print(f"🔍 Kontrol ediliyor: {anime_name}")
+                    
+                    # Anime bilgilerini çek
+                    anime_info = self.anime_scraper.get_latest_episode(anime_name)
+                    
+                    if anime_info['found']:
+                        new_episode = anime_info['episode']
+                        
+                        # Önceki bölüm bilgisini al
+                        old_info = self.db_manager.get_anime_episode(anime_name)
+                        
+                        # Bölüm değişikliğini kontrol et
+                        is_new, has_changed = self.db_manager.check_episode_changed(anime_name, new_episode)
+                        
+                        if is_new:
+                            # İlk kez kontrol ediliyor - sadece kaydet
+                            print(f"  📝 İlk kayıt: {anime_name} - Episode {new_episode}")
+                            self.db_manager.update_anime_episode(
+                                anime_name=anime_name,
+                                episode=new_episode,
+                                url=anime_info['url'],
+                                image=anime_info['image']
+                            )
+                        elif has_changed:
+                            # Bölüm değişmiş - güncelle ve bildirim gönder
+                            old_episode = old_info['episode'] if old_info else 'unknown'
+                            print(f"  ✅ YENİ BÖLÜM: {anime_name} - {old_episode} → {new_episode}")
+                            
+                            # Veritabanını güncelle
+                            self.db_manager.update_anime_episode(
+                                anime_name=anime_name,
+                                episode=new_episode,
+                                url=anime_info['url'],
+                                image=anime_info['image']
+                            )
+                            
+                            # Güncelleme bilgisini kaydet
+                            updates_found.append({
+                                'anime_name': anime_name,
+                                'episode': new_episode,
+                                'url': anime_info['url'],
+                                'image': anime_info['image'],
+                                'old_episode': old_episode
+                            })
+                        else:
+                            print(f"  ℹ Değişiklik yok: {anime_name} - Episode {new_episode}")
+                    else:
+                        print(f"  ❌ Bulunamadı: {anime_name}")
+                    
+                except Exception as e:
+                    print(f"  ❌ Hata ({anime_name}): {e}")
+                    continue
+            
+            # Güncelleme varsa bildirimleri gönder
+            if updates_found:
+                print(f"\n📢 {len(updates_found)} yeni bölüm bulundu!")
+                self._send_anime_update_notifications(updates_found)
+            
+            # Sonraki pozisyona geç
+            self.current_anime_position += 1
+            
+            # En uzun listenin sonuna geldiysek başa dön
+            if self.current_anime_position >= max_list_length:
+                print(f"\n🔄 Tüm pozisyonlar kontrol edildi, başa dönülüyor\n")
+                self.current_anime_position = 0
+            else:
+                print(f"\n➡️  Sonraki pozisyon: {self.current_anime_position + 1}\n")
+            
+            # Son kontrol zamanını güncelle
+            self.db_manager.update_last_check()
+            
+            print(f"{'='*60}\n")
+            
+        except Exception as e:
+            print(f"❌ Kontrol hatası: {e}")
+    
+    def check_anime_updates(self):
+        """Eski metod - geriye uyumluluk için"""
+        self.check_single_anime_by_position()
+    
+    def _send_anime_update_notifications(self, updates):
+        """Güncellenen animeler için bildirimleri gönderir"""
+        try:
+            # Tüm kullanıcıları al
+            all_users = self.db_manager.get_all_users()
+            
+            if not all_users:
+                print("⚠ Bildirim gönderilecek kullanıcı yok")
+                return
+            
+            # Her güncelleme için
+            for update in updates:
+                anime_name = update['anime_name']
+                episode = update['episode']
+                url = update['url']
+                image = update['image']
+                old_episode = update['old_episode']
+                
+                # Bu anime'yi takip eden kullanıcıları bul
+                tokens_to_send = []
+                for device_id, user_data in all_users.items():
+                    if anime_name in user_data.get('anime_list', []):
+                        token = user_data.get('fcm_token') or user_data.get('token')
+                        if token:
+                            tokens_to_send.append(token)
+                
+                if tokens_to_send:
+                    # Bildirim başlığı ve içeriği
+                    title = f"{anime_name} - Yeni Bölüm!"
+                    body = f"Episode {episode} yayınlandı! 🎬"
+                    
+                    # Bildirim verisi
+                    notification_data = {
+                        'type': 'episode_update',
+                        'anime_name': anime_name,
+                        'episode': episode,
+                        'old_episode': old_episode,
+                        'url': url or '',
+                        'image': image or ''
+                    }
+                    
+                    # Toplu bildirim gönder
+                    result = self.notification_service.send_bulk_notification(
+                        tokens=tokens_to_send,
+                        title=title,
+                        body=body,
+                        data=notification_data
+                    )
+                    
+                    if result['success']:
+                        print(f"  ✅ Bildirim gönderildi: {anime_name} -> {result['success_count']}/{len(tokens_to_send)} cihaz")
+                    else:
+                        print(f"  ❌ Bildirim hatası: {result.get('error')}")
+                else:
+                    print(f"  ℹ {anime_name} için bildirim gönderilecek kullanıcı yok")
+                    
+        except Exception as e:
+            print(f"❌ Bildirim gönderme hatası: {e}")
+    
     def _send_update_notifications(self, updates):
         """Güncellenen mangalar için bildirimleri gönderir"""
         try:
@@ -195,7 +378,7 @@ class MangaScheduler:
             print(f"❌ Bildirim gönderme hatası: {e}")
     
     def start(self):
-        """Scheduler'ı başlatır - Her 3 saatte bir çalışır, mangalar arası 14 dakika"""
+        """Scheduler'ı başlatır - Her 14 dakikada bir çalışır (manga ve anime sırayla)"""
         if self.is_running:
             print("⚠ Scheduler zaten çalışıyor")
             return
@@ -211,6 +394,15 @@ class MangaScheduler:
                 replace_existing=True
             )
             
+            self.scheduler.add_job(
+                self.check_anime_updates,
+                'interval',
+                minutes=2,
+                id='anime_update_check',
+                name='Anime Güncelleme Kontrolü (TEST)',
+                replace_existing=True
+            )
+            
             self.scheduler.start()
             self.is_running = True
             
@@ -218,7 +410,7 @@ class MangaScheduler:
             print("🧪 TEST MODU AKTİF - OTOMATIK GÜNCELLEME")
             print("="*60)
             print("⏰ Kontrol Zamanı: Her 2 dakikada bir")
-            print("📍 Pozisyon bazlı kontrol (1. manga → 2. manga → ...)")
+            print("📍 Pozisyon bazlı kontrol (manga ve anime ayrı ayrı)")
             print("📊 Durum: Çalışıyor")
         else:
             # PRODUCTION MODE: Her 14 dakikada bir çalışır
@@ -231,6 +423,15 @@ class MangaScheduler:
                 replace_existing=True
             )
             
+            self.scheduler.add_job(
+                self.check_anime_updates,
+                'interval',
+                minutes=14,
+                id='anime_update_check',
+                name='Anime Güncelleme Kontrolü (14 Dakika)',
+                replace_existing=True
+            )
+            
             self.scheduler.start()
             self.is_running = True
             
@@ -238,7 +439,7 @@ class MangaScheduler:
             print("🕐 OTOMATIK GÜNCELLEME SİSTEMİ AKTİF")
             print("="*60)
             print("⏰ Kontrol Zamanı: Her 14 dakikada bir")
-            print("📍 Her seferinde sıradaki pozisyonun mangalarını kontrol eder")
+            print("📍 Her seferinde sıradaki pozisyonun manga/anime'lerini kontrol eder")
             print("🔄 Render sürekli aktif kalır")
             print("📊 Durum: Çalışıyor")
         
@@ -246,6 +447,7 @@ class MangaScheduler:
         stats = self.db_manager.get_stats()
         print(f"👥 Kayıtlı Kullanıcı: {stats['total_users']}")
         print(f"📚 Takip Edilen Manga: {len(self.db_manager.get_all_tracked_manga())}")
+        print(f"🎬 Takip Edilen Anime: {len(self.db_manager.get_all_tracked_anime())}")
         if stats['last_check']:
             print(f"🕒 Son Kontrol: {stats['last_check']}")
         print("="*60 + "\n")
