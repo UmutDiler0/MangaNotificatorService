@@ -1,280 +1,190 @@
-# Manga Notificator API
+# Manga Notificator API - Simplified Version
 
-Android uygulamalarından manga/manhwa son bölüm bilgilerini almak için REST API.
+Manga ve manhwa'ların en son bölüm bilgilerini almak için basit bir API.
 
-## Özellikler
+## 🚀 Özellikler
 
-✅ REST API (Flask)
-✅ JSON request/response
-✅ CORS desteği (Android'den direkt erişim)
-✅ Raven Scans + MangaDex entegrasyonu
-✅ Rate limiting
-✅ Hata yönetimi
+- ✅ Giriş yapmadan kullanım
+- ✅ Manga ismine göre arama
+- ✅ En son bölüm bilgisi
+- ✅ Manga kapak görseli
+- ✅ Bölüm URL'i
+- ✅ Multiple manga sorgulama
 
-## Kurulum
-
-### 1. Bağımlılıkları Yükle
-
-```bash
-pip install flask flask-cors requests beautifulsoup4 lxml
-```
-
-### 2. API'yi Başlat
-
-```bash
-python api.py
-```
-
-API `http://localhost:5000` adresinde çalışacak.
-
-### 3. Test Et
-
-```bash
-python test_api.py
-```
-
-## API Endpoints
-
-### GET /health
-
-API'nin çalışıp çalışmadığını kontrol eder.
-
-**Response:**
-```json
-{
-  "status": "online",
-  "message": "Manga Notificator API is running"
-}
-```
+## 📡 API Endpoint
 
 ### POST /api/manga/latest
 
-Manga listesi alır ve son bölüm bilgilerini döndürür.
+Manga listesi gönderir ve son bölüm bilgilerini alır.
 
-**Request:**
+**URL:** `https://manganotificatorservice-ur6m.onrender.com/api/manga/latest`
+
+**Method:** POST
+
+**Content-Type:** application/json
+
+### Request Body
+
 ```json
 {
-  "manga_list": [
-    "One Piece",
-    "Lookism",
-    "Nano Machine"
-  ]
+  "manga_list": ["Solo Leveling", "One Piece", "Lookism"]
 }
 ```
 
-**Response:**
+### Response
+
 ```json
-{
-  "success": true,
-  "count": 3,
-  "data": [
-    {
-      "name": "One Piece",
-      "chapter": "1171",
-      "found": true
-    },
-    {
-      "name": "Lookism",
-      "chapter": "590",
-      "found": true
-    },
-    {
-      "name": "Nano Machine",
-      "chapter": "295",
-      "found": true
-    }
-  ]
+[
+  {
+    "name": "Solo Leveling",
+    "chapter": "200",
+    "found": true,
+    "url": "https://ravenscans.org/solo-leveling-chapter-200/",
+    "image": "https://i0.wp.com/ravenscans.org/wp-content/uploads/2025/05/solo-leveling.jpg"
+  },
+  {
+    "name": "One Piece",
+    "chapter": "1171",
+    "found": true,
+    "url": "https://ravenscans.org/one-piece-chapter-1171/",
+    "image": "https://ravenscans.org/wp-content/uploads/2024/12/one-piece.jpg"
+  },
+  {
+    "name": "Lookism",
+    "chapter": "590",
+    "found": true,
+    "url": "https://ravenscans.org/lookism-chapter-590/",
+    "image": "https://ravenscans.org/wp-content/uploads/2024/12/lookism.jpg"
+  }
+]
+```
+
+### Response Alanları
+
+| Alan | Tip | Açıklama |
+|------|-----|----------|
+| `name` | string | Manga adı |
+| `chapter` | string | En son bölüm numarası |
+| `found` | boolean | Manga bulundu mu? |
+| `url` | string | Bölümün URL'i (null olabilir) |
+| `image` | string | Manga kapak görseli (null olabilir) |
+
+## 🧪 Test
+
+### Python ile Test
+
+```python
+import requests
+
+url = "http://localhost:5000/api/manga/latest"
+data = {
+    "manga_list": ["Solo Leveling"]
 }
+
+response = requests.post(url, json=data)
+print(response.json())
 ```
 
-## Android Entegrasyonu
+### curl ile Test
 
-### Retrofit (Önerilen)
-
-#### 1. Gradle Dependencies
-
-```gradle
-dependencies {
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
-}
+```bash
+curl -X POST http://localhost:5000/api/manga/latest \
+  -H "Content-Type: application/json" \
+  -d '{"manga_list": ["Solo Leveling"]}'
 ```
 
-#### 2. API Interface
+### PowerShell ile Test
 
-```kotlin
-interface MangaApi {
-    @POST("api/manga/latest")
-    suspend fun getLatestChapters(@Body request: MangaRequest): MangaResponse
-    
-    @GET("health")
-    suspend fun healthCheck(): HealthResponse
-}
+```powershell
+$body = @{manga_list = @("Solo Leveling")} | ConvertTo-Json
+Invoke-RestMethod -Uri "http://localhost:5000/api/manga/latest" `
+  -Method POST `
+  -Body $body `
+  -ContentType "application/json"
 ```
 
-#### 3. Data Classes
+## 🛠️ Kurulum
 
-```kotlin
-data class MangaRequest(
-    val manga_list: List<String>
-)
+### Gereksinimler
 
-data class MangaResponse(
-    val success: Boolean,
-    val count: Int,
-    val data: List<MangaData>
-)
+- Python 3.8+
+- pip
 
-data class MangaData(
-    val name: String,
-    val chapter: String?,
-    val found: Boolean
-)
+### Kurulum Adımları
 
-data class HealthResponse(
-    val status: String,
-    val message: String
-)
+1. Repository'yi klonlayın:
+```bash
+git clone <repo-url>
+cd manga_notificator
 ```
 
-#### 4. Retrofit Instance
-
-```kotlin
-object RetrofitClient {
-    private const val BASE_URL = "http://YOUR_SERVER_IP:5000/"
-    
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
-    }
-    
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
-    
-    val api: MangaApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(MangaApi::class.java)
-    }
-}
+2. Sanal ortam oluşturun:
+```bash
+python -m venv venv
 ```
 
-#### 5. Kullanım (ViewModel)
+3. Sanal ortamı aktifleştirin:
 
-```kotlin
-class MangaViewModel : ViewModel() {
-    private val _mangaList = MutableLiveData<List<MangaData>>()
-    val mangaList: LiveData<List<MangaData>> = _mangaList
-    
-    fun fetchLatestChapters(mangaNames: List<String>) {
-        viewModelScope.launch {
-            try {
-                val request = MangaRequest(manga_list = mangaNames)
-                val response = RetrofitClient.api.getLatestChapters(request)
-                
-                if (response.success) {
-                    _mangaList.value = response.data
-                }
-            } catch (e: Exception) {
-                // Hata yönetimi
-                Log.e("MangaViewModel", "Error: ${e.message}")
-            }
-        }
-    }
-}
+**Windows:**
+```bash
+venv\Scripts\activate
 ```
 
-#### 6. Activity/Fragment'te Kullanım
-
-```kotlin
-class MainActivity : AppCompatActivity() {
-    private val viewModel: MangaViewModel by viewModels()
-    
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        // Manga listesini gözlemle
-        viewModel.mangaList.observe(this) { mangaList ->
-            // RecyclerView'i güncelle
-            mangaList.forEach { manga ->
-                if (manga.found) {
-                    println("${manga.name}: Chapter ${manga.chapter}")
-                } else {
-                    println("${manga.name}: Bulunamadı")
-                }
-            }
-        }
-        
-        // API'den veri çek
-        val mangaNames = listOf("One Piece", "Lookism", "Nano Machine")
-        viewModel.fetchLatestChapters(mangaNames)
-    }
-}
+**Linux/Mac:**
+```bash
+source venv/bin/activate
 ```
 
-### AndroidManifest.xml
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-
-<application
-    android:usesCleartextTraffic="true">
-    <!-- ... -->
-</application>
+4. Gereksinimleri yükleyin:
+```bash
+pip install -r requirements.txt
 ```
 
-## Sunucu Dağıtımı
-
-### Localhost (Geliştirme)
+5. API'yi başlatın:
 ```bash
 python api.py
 ```
 
-### Production (Gunicorn ile)
-```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 api:app
-```
+API `http://localhost:5000` adresinde çalışmaya başlar.
 
-### Docker
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "api:app"]
-```
+## 📦 Deployment (Render)
 
-## Notlar
+1. Render.com'da yeni bir Web Service oluşturun
+2. GitHub repository'nizi bağlayın
+3. Build Command: `pip install -r requirements.txt`
+4. Start Command: `gunicorn wsgi:application`
+5. Deploy edin
 
-- **IP Adresi:** Localhost yerine sunucunuzun IP adresini kullanın
-- **CORS:** API tüm origin'lere açık (production'da kısıtlayın)
-- **Rate Limiting:** Her manga için 0.5 saniye bekleme var
-- **Timeout:** Request'ler 10 saniye sonra timeout olur
-- **Kaynak:** Önce Raven Scans, sonra MangaDex kullanılır
+## 🌐 Veri Kaynakları
 
-## Sorun Giderme
+API aşağıdaki kaynaklardan veri çeker:
 
-### Connection Refused
-- API'nin çalıştığından emin olun: `python api.py`
-- Firewall ayarlarını kontrol edin
-- Doğru IP ve port kullandığınızdan emin olun
+1. **Raven Scans** (Birincil)
+   - URL: https://ravenscans.org
+   - Desteklenen seriler: Solo Leveling, Lookism, One Piece, vb.
 
-### CORS Hatası
-- `flask-cors` paketinin yüklü olduğundan emin olun
-- API kodunda `CORS(app)` satırının olduğunu kontrol edin
+2. **MangaDex** (Yedek)
+   - URL: https://mangadex.org
+   - API: https://api.mangadex.org
 
-### Timeout
-- İnternet bağlantınızı kontrol edin
-- Manga isimlerinin doğru olduğundan emin olun
+## ⚠️ Notlar
 
-## Lisans
+- Rate limiting: Her manga için 0.5 saniye bekleme süresi
+- Timeout: 10 saniye
+- Manga bulunamazsa `found: false` döner
+- Manga isimleri büyük/küçük harf duyarlı değildir
+- Manga isimleri normalize edilir (boşluklar çizgiye dönüştürülür)
 
-MIT
+## 📝 Değişiklik Listesi (v2.0.0)
+
+- ✅ Giriş yapma sistemi kaldırıldı
+- ✅ Bildirim sistemi kaldırıldı
+- ✅ Veritabanı sistemi kaldırıldı
+- ✅ Scheduler kaldırıldı
+- ✅ Sadece manga arama özelliği bırakıldı
+- ✅ API basitleştirildi
+- ✅ Gereksiz bağımlılıklar kaldırıldı
+
+## 📄 Lisans
+
+MIT License
